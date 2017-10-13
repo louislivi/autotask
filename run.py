@@ -3,17 +3,22 @@
 
 from unrar import rarfile
 from wordChangeTxt import Translate
-import urllib2, urllib, re, time, os, cookielib, inspect, codecs
+from progressbar import *
+from requests.auth import HTTPBasicAuth
+import urllib2, urllib, re, time, os, cookielib, inspect, codecs, sys, requests, random
 
 class Task:
 
 	#登录的用户名和密码
-	username = "cqliwei321"
-	password = "liwei123"
-	url="http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=zk103b"
+	username = "cqchenshuai"
+	password = "cq123456"
+	url=""
 	previous_cookie = ""
+	all_task_url = {}
 
 	def __init__(self):
+		#self.username = raw_input("username: ")  
+		#self.password = raw_input("password: ")  
 		self.run()
 
 	def getHtmlSource(self, url, username, password, data = {}):
@@ -67,7 +72,45 @@ class Task:
 	            raise e
 	    except:
 	        return None
-
+	def getNotTask(self):
+		url = "http://learning.cmr.com.cn/myCourse/homeworkList.asp"
+		print u'获取未完成作业列表...'
+		html = self.getHtmlSource(url, self.username, self.password)
+		regex_content = re.compile(
+	            '<tr.*?>.*?<td.*?>\s?(.*?)</td>.*?<td.*?>(.*?)</td>.*?<td.*?>(.*?)</td>\s*</tr>',
+	            re.S)
+		items = re.findall(regex_content, html)
+		for item in items:
+			if item[2].isdigit():
+				surplus = int(item[1]) - int(item[2])
+				if (surplus) > 0:
+					print str(item[0])+u':剩余'+str(surplus)+u'项作业未完成！'
+					subject_list_url = "http://learning.cmr.com.cn/myCourse/mycourse.asp"
+					subject_list_html = self.getHtmlSource(subject_list_url, self.username, self.password)
+					regex_content = re.compile(
+							'<div.*?class=\"courseTitle\".*?id=\".*?\".*?>.*?<a.*?href=\"(.*?)\".*?>(.*?)</a>',
+							re.S)
+					subject_list_items = re.findall(regex_content, subject_list_html)
+					for subject_list_item in subject_list_items:
+						current_subject = subject_list_item[1][:-1]
+						if current_subject == item[0]:
+							task_url = subject_list_item[0]
+							
+					print task_url
+					task_page = requests.get(task_url, auth=HTTPBasicAuth(self.username, self.password))
+					task_html = task_page.text
+					regex_content = re.compile(
+							'{\'courseid\':\'(.*?)\'}',
+							re.S)	
+					task_items = re.findall(regex_content, task_html)
+					self.all_task_url[str(item[0])] = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid="+task_items[0]
+					print self.all_task_url
+					
+				else:
+					print str(item[0])+u":已完成全部作业"
+			else:
+				print str(item[0])+u":已完成全部作业"
+	
 	def downloadTask(self, html):
 		regex_content = re.compile(
 	            '<div.*?class="button_blue2".*?href=\"(.+?)\"',
@@ -80,9 +123,14 @@ class Task:
 		if not os.path.isdir(filedir): os.mkdir(filedir)
 		rar_path = os.path.join(filedir,"task.rar")
 		print items[0]+'=======>'+rar_path #下载地址
-		urllib.urlretrieve(items[0], rar_path)
-		print "download finish!"
-		print "unrar......!"
+		widgets = [u'答案下载进度: ', Percentage(), ' ', Bar(marker=RotatingMarker('>-=')),
+           ' ', ETA(), ' ', FileTransferSpeed()]
+		self.pbar = ProgressBar(widgets=widgets, maxval=100).start()
+		urllib.urlretrieve(items[0], rar_path, self.Schedule)
+		self.pbar.finish()
+		self.pbar = ''
+		print "download finish"
+		print "unrar...!"
 		file = rarfile.RarFile(rar_path)  #这里写入的是需要解压的文件，别忘了加路径
 		file.extractall(filedir)  #这里写入的是你想要解压到的文件夹
 		print "unrar finish!"
@@ -90,11 +138,43 @@ class Task:
 		print answer_path
 		#返回答案结果
 		
-		answer = open(answer_path,'r')
+		#answer = open(answer_path,'r')
 		#answer = open(os.path.join(script_path(),"task\\task_20171011200841\\data\\ZK133A.txt"),'r')
 		#print(answer.readlines().encode('utf8'))
-		reader = codecs.getreader('gbk')(answer)
+		# try:
+		#reader = codecs.getreader('gbk')(answer)
+		reader = codecs.open(answer_path,'r', 'gbk', 'ignore')
+		# except Exception, e:
+			# if "invalid start byte" in str(e):
+		#reader = codecs.getreader()(answer)
+		#print reader.read()
 		return reader.read()
+		#return answer.read()
+	
+	def whichEncode(text):
+		text0 = text[0]
+		try:
+			text0.decode('utf8')
+		except Exception, e:
+			if "unexpected end of data" in str(e):
+				return "utf8"
+			elif "invalid start byte" in str(e):
+				return "gbk_gb2312"
+			elif "ascii" in str(e):
+				return "Unicode"
+		return "utf8"
+	
+		
+	def Schedule(self,a,b,c):
+		'''''
+		a:已经下载的数据块
+		b:数据块的大小
+		c:远程文件的大小
+		'''
+		per = 100.0 * a * b / c
+		if per > 100 :
+			per = 100
+		self.pbar.update(per)
 		
 	def get_question(self, answer_data, task_html, task_url):
 		#匹配问题列表
@@ -120,8 +200,11 @@ class Task:
 				regex_content = re.compile(
 					question_num_item+'.*?'+answer_regex.encode('gbk')+'([A-Z])',
 					re.S)
-				answer_items = re.findall(regex_content, answer_data.encode('gbk'))
-				answer[question_num_item] = answer_items[0]
+				answer_items = re.findall(regex_content, answer_data)
+				if answer_items:
+					answer[question_num_item] = answer_items[0]
+				else:
+					answer[question_num_item] =  random.sample('ABCD',1)
 				
 			#获取提交答案路径
 			regex_content = re.compile(
@@ -146,6 +229,7 @@ class Task:
 		print u'该科目作业已全部完成！！'
 
 	def getScore(self, html):
+		print html
 		regex_content = re.compile(
 	            '<div.*?class=\"line1\".*?>.*?<p>(.*?)</p>',
 	            re.S)
@@ -158,22 +242,30 @@ class Task:
 		return os.path.abspath(os.path.dirname(caller_file))# path
 
 	def run(self):
-
-		html = self.getHtmlSource(self.url, self.username, self.password)
-		#print html
-		items = regex_content = re.compile(
-	            '<iframe.*?id="iframe".*?src=\"(.+?)\"',
-	            re.S)
-		items = re.findall(regex_content, html)
-		task_url = items[0]
-		print task_url
-		task_url_items = regex_content = re.compile(
-	            '(.*?\/.*?)[^\/]*\.asp.*?',
-	            re.S)
-		task_url_items = re.findall(regex_content, self.url)
-		task_html = self.getHtmlSource(task_url_items[0]+task_url, self.username, self.password)
-		answer_data = self.downloadTask(task_html)
-		self.get_question(answer_data,task_html,task_url_items[0])
+		self.getNotTask();
+		for index in self.all_task_url:
+			print u'开始完成'+index+u'课程...'
+			self.url = self.all_task_url[index]
+			html = self.getHtmlSource(self.url, self.username, self.password)
+			if html == None:
+				print u'服务器异常,请稍后再试！'
+				return False
+			items = regex_content = re.compile(
+					'<iframe.*?id="iframe".*?src=\"(.+?)\"',
+					re.S)
+			items = re.findall(regex_content, html)
+			if not items:
+				print u'服务器异常,请稍后再试！'
+				return False
+			task_url = items[0]
+			print task_url
+			task_url_items = regex_content = re.compile(
+					'(.*?\/.*?)[^\/]*\.asp.*?',
+					re.S)
+			task_url_items = re.findall(regex_content, self.url)
+			task_html = self.getHtmlSource(task_url_items[0]+task_url, self.username, self.password)
+			answer_data = self.downloadTask(task_html)
+			self.get_question(answer_data,task_html,task_url_items[0])
 
 	def __del__(self):
 		self.previous_cookie = ''

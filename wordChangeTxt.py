@@ -14,7 +14,7 @@ import fnmatch
   
   
 all_FileNum = 0  
-debug = 0  
+debug = 1  
   
   
 def Translate(path):  
@@ -68,8 +68,9 @@ def Translate(path):
             doc.Close()  
             o.write(word_to_txt+'\n')  
             all_FileNum += 1  
-    finally:  
-        wordapp.Quit()  
+    finally:
+        wordapp.Quit()
+		
 	return word_to_txt
   
 if __name__ == '__main__':  
