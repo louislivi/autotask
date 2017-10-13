@@ -10,7 +10,7 @@ class Task:
 	#登录的用户名和密码
 	username = "cqliwei321"
 	password = "liwei123"
-	url="http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=zk133a"
+	url="http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=zk103b"
 	previous_cookie = ""
 
 	def __init__(self):
@@ -39,22 +39,25 @@ class Task:
 	        urllib2.install_opener(opener)  
 			# post数据
 	        if data:
+				print self.previous_cookie
 				headers = { 
 					'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
 					'Accept-Language': 'zh-CN,zh;q=0.8',
 					'Connection': 'keep-alive',
 					'Content-Type': 'application/x-www-form-urlencoded',
+					'Cookie':self.previous_cookie,
 					'Referer':'http://learning.cmr.com.cn',
 					'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.86 Safari/537.36',
 				}
 				data = urllib.urlencode(data)
+				#self.previous_cookie = ''
 				url = urllib2.Request(url, data, headers)
 			
 			#urllib2.urlopen 使用上面的opener.  
 	        ret = urllib2.urlopen(url)
-	      
+	        self.previous_cookie = ''
 	        for index, cookie in enumerate(cookie):
-	        	print '[',index, ']',cookie
+	        	self.previous_cookie += cookie.name+'='+cookie.value+';'
 	        
 	        return ret.read()
 	    except urllib2.HTTPError, e:
@@ -100,7 +103,8 @@ class Task:
 	            '<div.*?class=\"button_red\".*?<a.*?href=\"(.+?)\".*?class=\"a\_white\".*?>'+task_key_word.encode('gbk')+'</a>',
 	            re.S)
 		items = re.findall(regex_content, task_html.decode('gbk').encode('gbk'))
-		print items
+		if not (items):
+			print u'该科目作业已完成了'
 		for item in items:
 			#匹配单个问题url
 			question_html = self.getHtmlSource(task_url+item, self.username, self.password)
@@ -134,11 +138,19 @@ class Task:
 			#post提交答案
 			#test_url = 'http://192.168.92.129/Welcome/test11'
 			print u'延迟10秒提交答案...'
-			#time.sleep(10)
+			time.sleep(10)
 			result = self.getHtmlSource(post_question_url, self.username, self.password, data)
 			print data
-			print result
-			return 
+			print self.getScore(result)
+
+		print u'该科目作业已全部完成！！'
+
+	def getScore(self, html):
+		regex_content = re.compile(
+	            '<div.*?class=\"line1\".*?>.*?<p>(.*?)</p>',
+	            re.S)
+		items = re.findall(regex_content, html.decode('gbk').encode('gbk'))
+		print items[0]
 
 
 	def script_path(self):
@@ -162,6 +174,10 @@ class Task:
 		task_html = self.getHtmlSource(task_url_items[0]+task_url, self.username, self.password)
 		answer_data = self.downloadTask(task_html)
 		self.get_question(answer_data,task_html,task_url_items[0])
+
+	def __del__(self):
+		self.previous_cookie = ''
+		
 
 Task()
 	
