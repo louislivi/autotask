@@ -69,9 +69,11 @@ class Task:
 	        if e.code == 401:
 	           return "authorization failed"
 	        else:
-	            raise e
+	           raise e
 	    except:
+			
 	        return None
+			
 	def getNotTask(self):
 		url = "http://learning.cmr.com.cn/myCourse/homeworkList.asp"
 		print u'获取未完成作业列表...'
@@ -110,6 +112,8 @@ class Task:
 					print str(item[0])+u":已完成全部作业"
 			else:
 				print str(item[0])+u":已完成全部作业"
+		else:
+			print u'连接服务器失败，请稍后再试！'
 	
 	def downloadTask(self, html):
 		regex_content = re.compile(
@@ -135,6 +139,9 @@ class Task:
 		file.extractall(filedir)  #这里写入的是你想要解压到的文件夹
 		print "unrar finish!"
 		answer_path = Translate(filedir)
+		if not os.path.exists(answer_path):
+			notic = u"自动转换失败，请将:"+filedir+u" 下的word文件，复制为txt文件保存到:"+answer_path+u"后按回车键！"
+			raw_input(notic)
 		print answer_path
 		#返回答案结果
 		
@@ -188,7 +195,7 @@ class Task:
 		for item in items:
 			#匹配单个问题url
 			question_html = self.getHtmlSource(task_url+item, self.username, self.password)
-			question_regex = u'【(.*?)】'
+			question_regex = u'[【\[](.*?)[】\]]'
 			regex_content = re.compile(
 	            question_regex.encode('gbk'),
 	            re.S)
@@ -196,16 +203,37 @@ class Task:
 			answer = {}
 			for question_num_item in question_num_items:
 				#匹配问题答案
-				answer_regex = u'案】'
+				answer_regex = u'案[】\]]'
+				print answer_data
+				print question_num_item+'[^'+u'案'+']*'+answer_regex+'([A-Z])'
 				regex_content = re.compile(
-					question_num_item+'.*?'+answer_regex.encode('gbk')+'([A-Z])',
+					question_num_item+'[^'+u'案'+']*'+answer_regex.encode('gbk')+'([A-Z])',
 					re.S)
-				answer_items = re.findall(regex_content, answer_data)
-				if answer_items:
-					answer[question_num_item] = answer_items[0]
+				#单项选择题
+				radio_items = re.findall(regex_content, answer_data)
+				if radio_items:
+					answer[question_num_item] = radio_items[0]
 				else:
-					answer[question_num_item] =  random.sample('ABCD',1)
-				
+					#判断题
+					regex_content = re.compile(
+					question_num_item+'[^'+u'案'+']*'+answer_regex.encode('gbk')+u'(正确|错误)',
+					re.S)
+					judge_items = re.findall(regex_content, answer_data)
+					if judge_items:
+						if judge_items[0] == u'正确':
+							answer[question_num_item] = 1
+						else:
+							answer[question_num_item] = 0
+					else:
+						#多项选择题
+						regex_content = re.compile(
+						question_num_item+'[^'+u'案'+']*'+answer_regex.encode('gbk')+'([A-Z,]*)',
+						re.S)
+						checkbox_items = re.findall(regex_content, answer_data)
+						if checkbox_items:
+							answer[question_num_item] =  checkbox_items[0]
+						else:
+							answer[question_num_item] =  ''
 			#获取提交答案路径
 			regex_content = re.compile(
 	            '<form.*?id="form1".*?name="form1".*?action="(.*?)"',
@@ -229,11 +257,13 @@ class Task:
 		print u'该科目作业已全部完成！！'
 
 	def getScore(self, html):
-		print html
 		regex_content = re.compile(
 	            '<div.*?class=\"line1\".*?>.*?<p>(.*?)</p>',
 	            re.S)
 		items = re.findall(regex_content, html.decode('gbk').encode('gbk'))
+		if not items:
+			print u'提交数据失败！'
+			return False
 		print items[0]
 
 
@@ -266,6 +296,13 @@ class Task:
 			task_html = self.getHtmlSource(task_url_items[0]+task_url, self.username, self.password)
 			answer_data = self.downloadTask(task_html)
 			self.get_question(answer_data,task_html,task_url_items[0])
+		# testurl = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/Model.asp?courseid=zk134a&isshow=1"
+		# task_html = self.getHtmlSource(testurl, self.username, self.password)
+		# answer_path = u"C:\\Users\\李巍\\Desktop\\pythontask\\autotask\\task\\task_20171016200850\\data\\ZK134A.txt"
+		# reader = codecs.open(answer_path,'r', 'gbk', 'ignore')
+		# test_data = reader.read()
+		# testurl = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/";
+		# self.get_question(test_data,task_html,testurl)
 
 	def __del__(self):
 		self.previous_cookie = ''
