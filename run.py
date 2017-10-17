@@ -231,7 +231,7 @@ class Task:
 					else:
 						#多项选择题
 						regex_content = re.compile(
-						question_num_item+'[^'+u'案'+']*'+answer_regex+'([A-Z\,]*)',
+						question_num_item+'[^'+u'案'+']*'+answer_regex+'([A-Z],[^\n]+)',
 						re.S)
 						checkbox_items = re.findall(regex_content, answer_data)
 						if checkbox_items:
