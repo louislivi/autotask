@@ -5,7 +5,7 @@ from unrar import rarfile
 from wordChangeTxt import Translate
 from progressbar import *
 from requests.auth import HTTPBasicAuth
-import urllib2, urllib, re, time, os, cookielib, inspect, codecs, sys, requests, random, chardet
+import urllib2, urllib, re, time, os, cookielib, inspect, codecs, sys, requests, random, chardet, msvcrt
 
 class Task:
 
@@ -17,8 +17,8 @@ class Task:
 	all_task_url = {}
 
 	def __init__(self):
-		self.username = raw_input("username: ")  
-		self.password = raw_input("password: ")  
+		self.username = raw_input("用户名: ")  
+		self.password = self.pwd_input("密码: ")
 		self.run()
 
 	def getHtmlSource(self, url, username, password, data = {}):
@@ -67,9 +67,10 @@ class Task:
 	        return ret.read()
 	    except urllib2.HTTPError, e:
 	        if e.code == 401:
-	           return "authorization failed"
+				print "账号或密码错误！"
+				return "authorization failed"
 	        else:
-	           raise e
+				raise e
 	    except:
 			
 	        return None
@@ -113,8 +114,29 @@ class Task:
 			else:
 				print str(item[0])+':已完成全部作业'
 		else:
-			print '连接服务器失败，请稍后再试！'
-	
+			print '已完成全部作业'
+			
+	def pwd_input(self,notic):
+		print notic,
+		chars = []
+		while True:
+			newChar = msvcrt.getch()
+			if newChar in '\r\n':
+			# 如果是换行，则输入结束
+				print ''
+				break
+			elif newChar == '\b':
+			# 如果是退格，则删除末尾一位
+				if chars:
+					del chars[-1]
+					sys.stdout.write('\b')
+				# 删除一个星号，但是不知道为什么不能执行...
+			else:
+				chars.append(newChar)
+				sys.stdout.write('*')
+			# 显示为星号
+		return ''.join(chars)
+		
 	def downloadTask(self, html):
 		regex_content = re.compile(
 	            '<div.*?class="button_blue2".*?href=\"(.+?)\"',
@@ -312,6 +334,7 @@ class Task:
 
 	def __del__(self):
 		self.previous_cookie = ''
+		os.system('pause')
 		
 
 Task()
