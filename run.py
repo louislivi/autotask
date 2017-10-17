@@ -10,15 +10,15 @@ import urllib2, urllib, re, time, os, cookielib, inspect, codecs, sys, requests,
 class Task:
 
 	#登录的用户名和密码
-	username = "cqchenshuai"
-	password = "cq123456"
+	username = ""
+	password = ""
 	url=""
 	previous_cookie = ""
 	all_task_url = {}
 
 	def __init__(self):
-		#self.username = raw_input("username: ")  
-		#self.password = raw_input("password: ")  
+		self.username = raw_input("username: ")  
+		self.password = raw_input("password: ")  
 		self.run()
 
 	def getHtmlSource(self, url, username, password, data = {}):
