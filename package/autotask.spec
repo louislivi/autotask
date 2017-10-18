@@ -3,8 +3,8 @@
 block_cipher = None
 
 
-a = Analysis(['E:\\python\\run.py'],
-             pathex=['E:\\python\\package'],
+a = Analysis(['C:\\Users\\\xc0\xee\xce\xa1\\Desktop\\pythontask\\autotask\\code\\run.py'],
+             pathex=['C:\\Users\\\xc0\xee\xce\xa1\\Desktop\\pythontask\\autotask\\package'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -23,7 +23,7 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True , icon='E:\\python\\package\\log\\rd.ico')
+          console=True , icon='C:\\Users\\¿ÓŒ°\\Desktop\\pythontask\\autotask\\package\\log\\rd.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

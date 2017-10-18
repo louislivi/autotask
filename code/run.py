@@ -63,7 +63,7 @@ class Task:
 	        self.previous_cookie = ''
 	        for index, cookie in enumerate(cookie):
 	        	self.previous_cookie += cookie.name+'='+cookie.value+';'
-	        
+			time.sleep(3)
 	        return ret.read()
 	    except urllib2.HTTPError, e:
 	        if e.code == 401:
@@ -219,7 +219,7 @@ class Task:
 		for item in items:
 			#匹配单个问题url
 			question_html = self.getHtmlSource(task_url+item, self.username, self.password)
-			question_regex = '【(.*?)】'
+			question_regex = '【([^】]*)】'
 			regex_content = re.compile(
 	            question_regex,
 	            re.S)
@@ -227,7 +227,6 @@ class Task:
 			answer = {}
 			#print chardet.detect(answer_data)
 			for question_num_item in question_num_items:
-				
 				#匹配问题答案
 				answer_regex = u'案】'
 				
