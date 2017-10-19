@@ -14,7 +14,7 @@ import fnmatch
   
   
 all_FileNum = 0  
-debug = 1  
+debug = 0
   
   
 def Translate(path):  
