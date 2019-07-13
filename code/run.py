@@ -1,17 +1,18 @@
 # !/usr/bin/python
-# -*-coding:gbk-*-
+# -*-coding:utf-8-*-
 
 import gevent
 from threading import Thread
 from unrar import rarfile
 from wordChangeTxt import Translate
 from progressbar import *
+from pyquery import PyQuery as pq
 from requests.auth import HTTPBasicAuth
 from gevent import monkey; monkey.patch_all()
 import urllib2, urllib, re, time, os, cookielib, inspect, codecs, sys, requests, random, msvcrt
-
+import chardet
 u'''
-    ¶àÏß³ÌÆ¥Åä´ğ°¸
+    å¤šçº¿ç¨‹åŒ¹é…ç­”æ¡ˆ
 '''
 class AnswerThread(Thread):
     def __init__(self, question_num_item, answer_data):
@@ -26,44 +27,36 @@ class AnswerThread(Thread):
         return self.result
 
 u'''
-    ×÷ÒµÀà
+    ä½œä¸šç±»
 '''
 class Task:
-    # µÇÂ¼µÄÓÃ»§ÃûºÍÃÜÂë
+    # ç™»å½•çš„ç”¨æˆ·åå’Œå¯†ç 
     username = ""
     password = ""
-    url = "" #×÷ÒµÇëÇóµØÖ·
+    url = "" #ä½œä¸šè¯·æ±‚åœ°å€
     previous_cookie = "" #cookie
-    all_task_url = {} #×÷ÒµµØÖ·
+    all_task_url = {} #ä½œä¸šåœ°å€
 
     def __init__(self):
-        self.username = raw_input('ÇëÊäÈëÓÃ»§Ãû£º')
-        self.password = self.pwd_input('ÇëÊäÈëÃÜÂë  : ')
+        # self.username = raw_input('è¯·è¾“å…¥ç”¨æˆ·åï¼š')
+        # self.password = self.pwd_input('è¯·è¾“å…¥å¯†ç   : ')
         self.run()
 
     u'''
-        urllib2ÇëÇó
+        urllib2è¯·æ±‚
     '''
     def getHtmlSource(self, url, username, password, data=None):
         try:
-            # ½¨Á¢´øÓĞcookieµÄopener
+            # å»ºç«‹å¸¦æœ‰cookieçš„opener
             cookie = cookielib.CookieJar()
             cookieProc = urllib2.HTTPCookieProcessor(cookie)
-
-            # ´´½¨Ò»¸öÃÜÂë¹ÜÀíÕß
-            password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            # Ìí¼ÓÓÃ»§ÃûºÍÃÜÂë
-            password_mgr.add_password(None, url, username, password)
-            # ´´½¨ÁËÒ»¸öĞÂµÄhandler
-            handler = urllib2.HTTPBasicAuthHandler(password_mgr)
-
-            # ´´½¨ "opener"
-            opener = urllib2.build_opener(handler)
+            # åˆ›å»º "opener"
+            opener = urllib2.build_opener()
             opener.add_handler(cookieProc)
-            # Ê¹ÓÃ opener »ñÈ¡Ò»¸öURL
+            # ä½¿ç”¨ opener è·å–ä¸€ä¸ªURL
             opener.open(url)
 
-            # °²×° opener.
+            # å®‰è£… opener.
             urllib2.install_opener(opener)
             headers = {
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -74,24 +67,23 @@ class Task:
                 'Referer': 'http://learning.cmr.com.cn',
                 'User-Agent': self.randHeaderUserAgent(),
             }
-            # postÊı¾İ
+            # postæ•°æ®
             if data:
-                print self.previous_cookie
                 data = urllib.urlencode(data)
                 url = urllib2.Request(url, data, headers)
             else:
                 url = urllib2.Request(url, headers=headers)
-            # urllib2.urlopen Ê¹ÓÃÉÏÃæµÄopener.
+            # urllib2.urlopen ä½¿ç”¨ä¸Šé¢çš„opener.
             ret = urllib2.urlopen(url)
-            self.previous_cookie = ''
+            # self.previous_cookie = ''
             for index, cookie in enumerate(cookie):
                 self.previous_cookie += cookie.name + '=' + cookie.value + ';'
-            #print 'ÇëÇóÍê³É£¬µÈ´ı3Ãë£¡'
+            #print 'è¯·æ±‚å®Œæˆï¼Œç­‰å¾…3ç§’ï¼'
             #time.sleep(3)
             return ret.read()
         except urllib2.HTTPError, e:
             if e.code == 401:
-                print "ÕËºÅ»òÃÜÂë´íÎó£¡"
+                print u"è´¦å·æˆ–å¯†ç é”™è¯¯ï¼"
                 return "authorization failed"
             else:
                 raise e
@@ -100,7 +92,7 @@ class Task:
             return None
 
     u'''
-        Ëæ»úheaderÓÃ»§Í·
+        éšæœºheaderç”¨æˆ·å¤´
     '''
     def randHeaderUserAgent(self):
         head_user_agent = ['Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko',
@@ -125,56 +117,55 @@ class Task:
         return head_user_agent[random.randrange(0, len(head_user_agent))]
 
     u'''
-        »ñÈ¡Î´Íê³É×÷ÒµÂ·¾¶
+        è·å–æœªå®Œæˆä½œä¸šè·¯å¾„
     '''
     def getNotTask(self):
         url = "http://learning.cmr.com.cn/myCourse/homeworkList.asp"
-        print '»ñÈ¡Î´Íê³É×÷ÒµÁĞ±í...'
+        print u'è·å–æœªå®Œæˆä½œä¸šåˆ—è¡¨...'
         html = self.getHtmlSource(url, self.username, self.password)
+        if "window.top.location.href" in html:
+            print u"è´¦å·æˆ–å¯†ç é”™è¯¯ï¼"
+            return "authorization failed"
         regex_content = re.compile(
             '<tr.*?>.*?<td.*?>\s?(.*?)</td>.*?<td.*?>(.*?)</td>.*?<td.*?>(.*?)</td>\s*</tr>',
             re.S)
-        items = re.findall(regex_content, html)
+        items = re.findall(regex_content, html.decode('gb2312').encode('utf-8'))
         for item in items:
+            item_title = str(item[0]).decode('utf-8')
             if item[2].isdigit():
                 surplus = int(item[1]) - int(item[2])
                 if (surplus) > 0:
-                    print str(item[0]) + ':Ê£Óà' + str(surplus) + 'Ïî×÷ÒµÎ´Íê³É£¡'
+                    print item_title + u':å‰©ä½™' + str(surplus).decode('ascii') + u'é¡¹ä½œä¸šæœªå®Œæˆï¼'
                     subject_list_url = "http://learning.cmr.com.cn/myCourse/mycourse.asp"
                     subject_list_html = self.getHtmlSource(subject_list_url, self.username, self.password)
-                    regex_content = re.compile(
-                        '<div.*?class=\"courseTitle\".*?id=\".*?\".*?>.*?<a.*?href=\"(.*?)\".*?>(.*?)</a>',
-                        re.S)
-                    subject_list_items = re.findall(regex_content, subject_list_html)
+                    # print subject_list_html
+                    d = pq(subject_list_html)
+                    subject_list_items =  d(".mycourse").find('div').children('a')
                     for subject_list_item in subject_list_items:
-                        current_subject = subject_list_item[1][:-1]
-                        if current_subject == item[0]:
-                            task_url = subject_list_item[0]
-
+                        if item_title == pq(subject_list_item).text()[0:-1]:
+                            task_url = pq(subject_list_item).attr('href')
                     print task_url
-                    task_page = requests.get(task_url, auth=HTTPBasicAuth(self.username, self.password))
-                    task_html = task_page.text
+                    task_html = self.getHtmlSource(task_url, self.username, self.password)
                     regex_content = re.compile(
                         '{\'courseid\':\'(.*?)\'}',
                         re.S)
                     task_items = re.findall(regex_content, task_html)
                     if task_items:
-                        self.all_task_url[str(
-                            item[0])] = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=" + \
+                        self.all_task_url[item_title] = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=" + \
                                         task_items[0]
                     else:
-                        print 'ÎŞ·¨Íê³É¸Ã¿ÆÄ¿£¡'+str(item[0])
+                        print u'æ— æ³•å®Œæˆè¯¥ç§‘ç›®ï¼'+item_title
                     print self.all_task_url
 
                 else:
-                    print str(item[0]) + ':ÒÑÍê³ÉÈ«²¿×÷Òµ'
+                    print item_title + u':å·²å®Œæˆå…¨éƒ¨ä½œä¸š'
             else:
-                print str(item[0]) + ':ÒÑÍê³ÉÈ«²¿×÷Òµ'
+                print item_title + u':å·²å®Œæˆå…¨éƒ¨ä½œä¸š'
         else:
-            print 'ÒÑÍê³ÉÈ«²¿×÷Òµ'
+            print u'å·²å®Œæˆå…¨éƒ¨ä½œä¸š'
 
     u'''
-        ÃÜÂëÊäÈë¿ò
+        å¯†ç è¾“å…¥æ¡†
     '''
     def pwd_input(self, notic):
         print notic,
@@ -182,23 +173,23 @@ class Task:
         while True:
             newChar = msvcrt.getch()
             if newChar in '\r\n':
-                # Èç¹ûÊÇ»»ĞĞ£¬ÔòÊäÈë½áÊø
+                # å¦‚æœæ˜¯æ¢è¡Œï¼Œåˆ™è¾“å…¥ç»“æŸ
                 print ''
                 break
             elif newChar == '\b':
-                # Èç¹ûÊÇÍË¸ñ£¬ÔòÉ¾³ıÄ©Î²Ò»Î»
+                # å¦‚æœæ˜¯é€€æ ¼ï¼Œåˆ™åˆ é™¤æœ«å°¾ä¸€ä½
                 if chars:
                     del chars[-1]
                     sys.stdout.write('\b')
-                    # É¾³ıÒ»¸öĞÇºÅ£¬µ«ÊÇ²»ÖªµÀÎªÊ²Ã´²»ÄÜÖ´ĞĞ...
+                    # åˆ é™¤ä¸€ä¸ªæ˜Ÿå·ï¼Œä½†æ˜¯ä¸çŸ¥é“ä¸ºä»€ä¹ˆä¸èƒ½æ‰§è¡Œ...
             else:
                 chars.append(newChar)
                 sys.stdout.write('*')
-                # ÏÔÊ¾ÎªĞÇºÅ
+                # æ˜¾ç¤ºä¸ºæ˜Ÿå·
         return ''.join(chars)
 
     u'''
-        ÏÂÔØ´ğ°¸
+        ä¸‹è½½ç­”æ¡ˆ
     '''
     def downloadTask(self, html):
         regex_content = re.compile(
@@ -206,32 +197,32 @@ class Task:
             re.S)
         items = re.findall(regex_content, html)
         print "downloading with urllib"
-        filedir_child = os.path.join(self.script_path(), "task")  # ½âÑ¹ºó·ÅÈëµÄÄ¿Â¼
-        filedir = os.path.join(filedir_child, "task_" + time.strftime('%Y%m%d%H%I%S'))  # ½âÑ¹ºó·ÅÈëµÄÄ¿Â¼
+        filedir_child = os.path.join(self.script_path(), "task")  # è§£å‹åæ”¾å…¥çš„ç›®å½•
+        filedir = os.path.join(filedir_child, "task_" + time.strftime('%Y%m%d%H%I%S'))  # è§£å‹åæ”¾å…¥çš„ç›®å½•
         if not os.path.isdir(filedir_child): os.mkdir(filedir_child)
         if not os.path.isdir(filedir): os.mkdir(filedir)
         rar_path = os.path.join(filedir, "task.rar")
         if not items:
-            print 'ÎŞ·¨Íê³ÉÖ÷¹ÛÌâ£¡'
+            print u'æ— æ³•å®Œæˆä¸»è§‚é¢˜ï¼'
             return False
-        print items[0] + '=======>' + rar_path  # ÏÂÔØµØÖ·
-        widgets = ['´ğ°¸ÏÂÔØ½ø¶È: ', Percentage(), ' ', Bar(marker=RotatingMarker('>-=')),
-                   ' ', ETA(), ' ', FileTransferSpeed()]
-        self.pbar = ProgressBar(widgets=widgets, maxval=100).start()
-        urllib.urlretrieve(items[0], rar_path, self.Schedule)
-        self.pbar.finish()
-        self.pbar = ''
+        print items[0] + '=======>' + rar_path  # ä¸‹è½½åœ°å€
+        # widgets = [u'ç­”æ¡ˆä¸‹è½½è¿›åº¦: ', Percentage(), ' ', Bar(marker=RotatingMarker('>-=')),
+        #            ' ', ETA(), ' ', FileTransferSpeed()]
+        # self.pbar = ProgressBar(widgets=widgets, maxval=100).start()
+        urllib.urlretrieve(items[0], rar_path)
+        # self.pbar.finish()
+        # self.pbar = ''
         print "download finish"
         print "unrar...!"
-        file = rarfile.RarFile(rar_path)  # ÕâÀïĞ´ÈëµÄÊÇĞèÒª½âÑ¹µÄÎÄ¼ş£¬±ğÍüÁË¼ÓÂ·¾¶
-        file.extractall(filedir)  # ÕâÀïĞ´ÈëµÄÊÇÄãÏëÒª½âÑ¹µ½µÄÎÄ¼ş¼Ğ
+        file = rarfile.RarFile(rar_path)  # è¿™é‡Œå†™å…¥çš„æ˜¯éœ€è¦è§£å‹çš„æ–‡ä»¶ï¼Œåˆ«å¿˜äº†åŠ è·¯å¾„
+        file.extractall(filedir)  # è¿™é‡Œå†™å…¥çš„æ˜¯ä½ æƒ³è¦è§£å‹åˆ°çš„æ–‡ä»¶å¤¹
         print "unrar finish!"
         answer_path = Translate(filedir)
         if not os.path.exists(answer_path):
-            notic = "×Ô¶¯×ª»»Ê§°Ü£¬Çë½«:" + filedir + " ÏÂµÄwordÎÄ¼ş£¬¸´ÖÆÎªtxtÎÄ¼ş±£´æµ½:" + answer_path + "ºó°´»Ø³µ¼ü£¡"
-            raw_input(notic)
+            notic = "è‡ªåŠ¨è½¬æ¢å¤±è´¥ï¼Œè¯·å°†:" + filedir + " ä¸‹çš„wordæ–‡ä»¶ï¼Œå¤åˆ¶ä¸ºtxtæ–‡ä»¶ä¿å­˜åˆ°:" + answer_path + "åæŒ‰å›è½¦é”®ï¼"
+            raw_input(notic.decode('utf-8').encode('gbk'))
         print answer_path
-        # ·µ»Ø´ğ°¸½á¹û
+        # è¿”å›ç­”æ¡ˆç»“æœ
 
         # answer = open(answer_path,'r')
         # answer = open(os.path.join(script_path(),"task\\task_20171011200841\\data\\ZK133A.txt"),'r')
@@ -246,13 +237,13 @@ class Task:
         # return answer.read()
 
     u'''
-        ½ø¶ÈÌõ
+        è¿›åº¦æ¡
     '''
     def Schedule(self, a, b, c):
         u'''''
-        a:ÒÑ¾­ÏÂÔØµÄÊı¾İ¿é
-        b:Êı¾İ¿éµÄ´óĞ¡
-        c:Ô¶³ÌÎÄ¼şµÄ´óĞ¡
+        a:å·²ç»ä¸‹è½½çš„æ•°æ®å—
+        b:æ•°æ®å—çš„å¤§å°
+        c:è¿œç¨‹æ–‡ä»¶çš„å¤§å°
         '''
         per = 100.0 * a * b / c
         if per > 100:
@@ -260,42 +251,48 @@ class Task:
         self.pbar.update(per)
 
     u'''
-        »ñÈ¡ÎÊÌâ£¬²¢Ìá½»´ğ°¸
+        è·å–é—®é¢˜ï¼Œå¹¶æäº¤ç­”æ¡ˆ
     '''
     def get_question(self, answer_data, task_html, task_url):
-        # Æ¥ÅäÎÊÌâÁĞ±í
-        task_key_word = '×ö×÷Òµ'
-        regex_content = re.compile(
-            '<div.*?class=\"button_red\".*?<a.*?href=\"(.+?)\".*?class=\"a\_white\".*?>' + task_key_word + '</a>',
-            re.S)
-        items = re.findall(regex_content, task_html)
+        print u'å¼€å§‹åšé¢˜'
+        # åŒ¹é…é—®é¢˜åˆ—è¡¨
+        task_key_word = u'åšä½œä¸š'
+        items = pq(task_html).find('div[class="button_red"]')
         if not (items):
-            print '¸Ã¿ÆÄ¿×÷ÒµÒÑÍê³ÉÁË'
+            print u'è¯¥ç§‘ç›®ä½œä¸šå·²å®Œæˆäº†'
         for item in items:
-            # Æ¥Åäµ¥¸öÎÊÌâurl
+            item = pq(item).children('a').attr('href')
+            # åŒ¹é…å•ä¸ªé—®é¢˜url
+            print 'http://learning.cmr.com.cn/student/acourse/HomeworkCenter/' + item
             question_html = self.getHtmlSource(task_url + item, self.username, self.password)
-            question_regex = '¡¾([^¡¿]*)¡¿'
+            question_regex = u'ã€([^ã€‘]*)ã€‘'
             regex_content = re.compile(
-                question_regex,
+                question_regex.encode('gbk'),
                 re.S)
             question_num_items = re.findall(regex_content, question_html)
             answer = {}
             # print chardet.detect(answer_data)
-            #¶àÏß³ÌÆ¥ÅäÎÊÌâ´ğ°¸
-            ts = [AnswerThread(question_num_item, answer_data) for question_num_item in question_num_items]
-            for t in ts:
-                t.start()
-            for t in ts:
-                t.join()
-                for key, value in t.get_result().items():
+            #å¤šçº¿ç¨‹åŒ¹é…é—®é¢˜ç­”æ¡ˆ
+            for question_num_item in question_num_items:
+                for key, value in self.find_answer(question_num_item, answer_data).items():
                     answer.setdefault(key, value)
-            # »ñÈ¡Ìá½»´ğ°¸Â·¾¶
+            # ts = [AnswerThread(question_num_item, answer_data) for question_num_item in question_num_items]
+            # for t in ts:
+            #     t.start()
+            # for t in ts:
+            #     t.join()
+            #     for key, value in t.get_result().items():
+            #         answer.setdefault(key, value)
+            # è·å–æäº¤ç­”æ¡ˆè·¯å¾„
             regex_content = re.compile(
                 '<form.*?id="form1".*?name="form1".*?action="(.*?)"',
                 re.S)
             post_question_url_items = re.findall(regex_content, question_html)
+            if not post_question_url_items:
+                print u'è¯¥ä½œä¸šæ— æ³•å®Œæˆ'
+                continue
             post_question_url = task_url + post_question_url_items[0]
-            # ´´½¨postÌå
+            # åˆ›å»ºpostä½“
             data = answer
             data['CourseID'] = \
             re.findall(re.compile('<input.*?name=\"CourseID\".*?value=\"(.*?)\"', re.S), question_html)[0]
@@ -304,47 +301,49 @@ class Task:
                 0]
             data['strStandardScore'] = \
             re.findall(re.compile('<input.*?name=\'strStandardScore\'.*?value=\'(.*?)\'', re.S), question_html)[0]
-            # postÌá½»´ğ°¸
+            # postæäº¤ç­”æ¡ˆ
             # test_url = 'http://192.168.92.129/Welcome/test11'
-            print 'ÑÓ³Ù10ÃëÌá½»´ğ°¸...'
+            print u'å»¶è¿Ÿ10ç§’æäº¤ç­”æ¡ˆ...'
             time.sleep(10)
             result = self.getHtmlSource(post_question_url, self.username, self.password, data)
             print data
             print self.getScore(result)
 
-        print '¸Ã¿ÆÄ¿×÷ÒµÒÑÈ«²¿Íê³É£¡£¡'
+        print u'è¯¥ç§‘ç›®ä½œä¸šå·²å…¨éƒ¨å®Œæˆï¼ï¼'
 
     u'''
-        ²éÕÒÎÊÌâ´ğ°¸
+        æŸ¥æ‰¾é—®é¢˜ç­”æ¡ˆ
     '''
     def find_answer(self, question_num_item, answer_data):
         answer = {}
-        # Æ¥ÅäÎÊÌâ´ğ°¸
-        answer_regex = u'°¸¡¿'
+        # åŒ¹é…é—®é¢˜ç­”æ¡ˆ
+        answer_regex = u'æ¡ˆã€‘'
 
-        question_regex = question_num_item + '[^' + u'°¸' + ']*' + answer_regex + '([A-Z])'
+        question_regex = question_num_item + '[^' + u'æ¡ˆ' + ']*' + answer_regex + '([A-Z])'
         regex_content = re.compile(
             question_regex,
             re.S)
-        # µ¥ÏîÑ¡ÔñÌâ
+        # å•é¡¹é€‰æ‹©é¢˜
         radio_items = re.findall(regex_content, answer_data)
         if radio_items:
             answer[question_num_item] = radio_items[0]
         else:
-            # ÅĞ¶ÏÌâ
+            # åˆ¤æ–­é¢˜
+            question_regex = question_num_item + '[^' + u'æ¡ˆ' + ']*' + answer_regex + u'(æ­£ç¡®|é”™è¯¯)'
             regex_content = re.compile(
-                question_num_item + '[^' + u'°¸' + ']*' + answer_regex + u'(ÕıÈ·|´íÎó)',
+                question_regex,
                 re.S)
             judge_items = re.findall(regex_content, answer_data)
             if judge_items:
-                if judge_items[0] == u'ÕıÈ·':
+                if judge_items[0] == u'æ­£ç¡®':
                     answer[question_num_item] = 1
                 else:
                     answer[question_num_item] = 0
             else:
-                # ¶àÏîÑ¡ÔñÌâ
+                # å¤šé¡¹é€‰æ‹©é¢˜
+                question_regex = question_num_item + '[^' + u'æ¡ˆ' + ']*' + answer_regex + '([A-Z],[^\n]+)'
                 regex_content = re.compile(
-                    question_num_item + '[^' + u'°¸' + ']*' + answer_regex + '([A-Z],[^\n]+)',
+                    question_regex,
                     re.S)
                 checkbox_items = re.findall(regex_content, answer_data)
                 if checkbox_items:
@@ -354,7 +353,7 @@ class Task:
         return answer
 
     u'''
-        »ñÈ¡×÷ÒµµÃ·Ö
+        è·å–ä½œä¸šå¾—åˆ†
     '''
     def getScore(self, html):
         regex_content = re.compile(
@@ -362,32 +361,32 @@ class Task:
             re.S)
         items = re.findall(regex_content, html)
         if not items:
-            print 'Ìá½»Êı¾İÊ§°Ü£¡'
+            print u'æäº¤æ•°æ®å¤±è´¥ï¼'
             return False
         return items[0]
 
     u'''
-        »ñÈ¡ÏîÄ¿¸ùÄ¿Â¼
+        è·å–é¡¹ç›®æ ¹ç›®å½•
     '''
     def script_path(self):
         caller_file = inspect.stack()[1][1]  # caller's filename
         return os.path.abspath(os.path.dirname(caller_file))  # path
     u'''
-        ¿ªÊ¼Íê³É¸÷¿ÆÄ¿×÷Òµ
+        å¼€å§‹å®Œæˆå„ç§‘ç›®ä½œä¸š
     '''
     def work_task(self, index):
-        print '¿ªÊ¼Íê³É' + index + '¿Î³Ì...'
+        print u'å¼€å§‹å®Œæˆ' + index + u'è¯¾ç¨‹...'
         self.url = self.all_task_url[index]
         html = self.getHtmlSource(self.url, self.username, self.password)
         if html == None:
-            print '·şÎñÆ÷Òì³£,ÇëÉÔºóÔÙÊÔ£¡'
+            print u'æœåŠ¡å™¨å¼‚å¸¸,è¯·ç¨åå†è¯•ï¼'
             return False
         items = regex_content = re.compile(
             '<iframe.*?id="iframe".*?src=\"(.+?)\"',
             re.S)
         items = re.findall(regex_content, html)
         if not items:
-            print '·şÎñÆ÷Òì³£,ÇëÉÔºóÔÙÊÔ£¡'
+            print u'æœåŠ¡å™¨å¼‚å¸¸,è¯·ç¨åå†è¯•ï¼'
             return False
         task_url = items[0]
         print task_url
@@ -399,19 +398,21 @@ class Task:
         answer_data = self.downloadTask(task_html)
         if not answer_data:
             return False
-        self.get_question(answer_data, task_html, task_url_items[0])
+        self.get_question(answer_data, task_html,'http://learning.cmr.com.cn/student/acourse/HomeworkCenter/')
 
     u'''
-        Æô¶¯
+        å¯åŠ¨
     '''
     def run(self):
         self.getNotTask()
-        #Ğ­³ÌÖ´ĞĞ
-        g = [gevent.spawn(self.work_task, url) for url in self.all_task_url]
-        gevent.joinall(g)
+        for url in self.all_task_url:
+            self.work_task(url)
+        #åç¨‹æ‰§è¡Œ
+        # g = [gevent.spawn(self.work_task, url) for url in self.all_task_url]
+        # gevent.joinall(g)
         # testurl = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/Model.asp?courseid=zk134a&isshow=1"
         # task_html = self.getHtmlSource(testurl, self.username, self.password)
-        # answer_path = "C:\\Users\\ÀîÎ¡\\Desktop\\pythontask\\autotask\\task\\task_20171016200850\\data\\ZK134A.txt"
+        # answer_path = "C:\\Users\\æå·\\Desktop\\pythontask\\autotask\\task\\task_20171016200850\\data\\ZK134A.txt"
         # reader = codecs.open(answer_path,'r', 'gbk', 'ignore')
         # test_data = reader.read()
         # testurl = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/";

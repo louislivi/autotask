@@ -37,7 +37,8 @@ def Translate(path):
         print New_dir  
     #创建一个文本存入所有的word文件名  
     fileNameSet= os.path.abspath(os.path.join(New_dir, 'fileNames.txt'))  
-    o=open(fileNameSet,"w")   
+    o=open(fileNameSet,"w")
+    wordapp = False
     try:  
         for filename in files:  
             if debug:  
