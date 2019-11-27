@@ -129,6 +129,10 @@ class App(Frame):
         if not os.path.exists(images_path): os.makedirs(images_path)
         Frame.__init__(self, **kw)
         self.init()
+        # cookie = ""
+        # task = Task("", "", "", [], cookie)
+        # task.init_tk()
+        # task.run()
         # 主循环
 
 
@@ -183,13 +187,14 @@ class Task:
         self.treeview_item += 1
         self.treeview.pack(side=LEFT, fill=BOTH)
 
-    def __init__(self, username, password, code, cookie):
+    def __init__(self, username, password, code, cookie, previous_cookie=""):
         # 第一个参数为第一层级，可能在这不太好理解，下篇文章中说到树状结构就理解了
         self.username = username
         self.password = password
         self.code = code
         for index, cookie in enumerate(cookie):
             self.previous_cookie += cookie.name + '=' + cookie.value + ';'
+        self.previous_cookie += previous_cookie
 
     def login(self):
         login_result = self.getHtmlSource("http://learning.cmr.com.cn/member/checklogin.asp", data={
@@ -206,7 +211,7 @@ class Task:
         urllib2请求
     '''
 
-    def getHtmlSource(self, url, data=None):
+    def getHtmlSource(self, url, data=None, source=False):
         try:
             # 建立带有cookie的opener
             cookie = cookielib.CookieJar()
@@ -231,7 +236,8 @@ class Task:
             # post数据
             if data:
                 headers['Content-Type'] = 'application/x-www-form-urlencoded'
-                data = urllib.urlencode(data)
+                if not source:
+                    data = urllib.urlencode(data)
                 url = urllib2.Request(url, data, headers)
             else:
                 url = urllib2.Request(url, headers=headers)
@@ -299,39 +305,36 @@ class Task:
         items = re.findall(regex_content, html.decode('gb2312').encode('utf-8'))
         for item in items:
             item_title = str(item[0]).decode('utf-8')
+            surplus = 0
             if item[2].isdigit():
                 surplus = int(item[1]) - int(item[2])
-                if (surplus) > 0:
-                    print item_title + u':剩余' + str(surplus).decode('ascii') + u'项作业未完成！'
-                    self.log_insert(item_title + u':剩余' + str(surplus).decode('ascii') + u'项作业未完成！')
-                    subject_list_url = "http://learning.cmr.com.cn/myCourse/mycourse.asp"
-                    subject_list_html = self.getHtmlSource(subject_list_url)
-                    # print subject_list_html
-                    d = pq(subject_list_html)
-                    subject_list_items = d(".mycourse").find('div').children('a')
-                    for subject_list_item in subject_list_items:
-                        if item_title == pq(subject_list_item).text()[0:-1]:
-                            task_url = pq(subject_list_item).attr('href')
-                    print task_url
-                    self.log_insert(task_url)
-                    task_html = self.getHtmlSource(task_url)
-                    regex_content = re.compile(
-                        '{\'courseid\':\'(.*?)\'}',
-                        re.S)
-                    task_items = re.findall(regex_content, task_html)
-                    if task_items:
-                        self.all_task_url[
-                            item_title] = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=" + \
-                                          task_items[0]
-                    else:
-                        print u'无法完成该科目！' + item_title
-                        self.log_insert(u'无法完成该科目！' + item_title)
-                    print self.all_task_url
-                    self.log_insert(self.all_task_url)
-
+            if surplus > 0:
+                print item_title + u':剩余' + str(surplus).decode('ascii') + u'项作业未完成！'
+                self.log_insert(item_title + u':剩余' + str(surplus).decode('ascii') + u'项作业未完成！')
+                subject_list_url = "http://learning.cmr.com.cn/myCourse/mycourse.asp"
+                subject_list_html = self.getHtmlSource(subject_list_url)
+                # print subject_list_html
+                d = pq(subject_list_html)
+                subject_list_items = d(".mycourse").find('div').children('a')
+                for subject_list_item in subject_list_items:
+                    if item_title == pq(subject_list_item).text()[0:-1]:
+                        task_url = pq(subject_list_item).attr('href')
+                print task_url
+                self.log_insert(task_url)
+                task_html = self.getHtmlSource(task_url)
+                regex_content = re.compile(
+                    '{\'courseid\':\'(.*?)\'}',
+                    re.S)
+                task_items = re.findall(regex_content, task_html)
+                if task_items:
+                    self.all_task_url[
+                        item_title] = "http://learning.cmr.com.cn/student/acourse/HomeworkCenter/index.asp?courseid=" + \
+                                      task_items[0]
                 else:
-                    print item_title + u':已完成全部作业'
-                    self.log_insert(item_title + u':已完成全部作业')
+                    print u'无法完成该科目！' + item_title
+                    self.log_insert(u'无法完成该科目！' + item_title)
+                print self.all_task_url
+                self.log_insert(self.all_task_url)
             else:
                 print item_title + u':已完成全部作业'
                 self.log_insert(item_title + u':已完成全部作业')
@@ -466,23 +469,36 @@ class Task:
         if not (items):
             print u'该科目作业已完成了'
             self.log_insert(u'该科目作业已完成了')
+            # items = pq(task_html).find('div[class="button_green"]')
         for item in items:
             item = pq(item).children('a').attr('href')
             # 匹配单个问题url
             print 'http://learning.cmr.com.cn/student/acourse/HomeworkCenter/' + item
             self.log_insert('http://learning.cmr.com.cn/student/acourse/HomeworkCenter/' + item)
             question_html = self.getHtmlSource(task_url + item)
+            # 匹配重做
+            re_try = re.search(re.compile('<input.*?name=\"button\".*?onclick=\"fn_ToNewHomeWork\(\);\"', re.S),
+                               question_html)
+            if re_try != None:
+                print u'重做...'
+                re_try_data = {}
+                re_try_data['CourseID'] = \
+                    re.findall(re.compile('<input.*?name=\"CourseID\".*?value=\"(.*?)\"', re.S), question_html)[0]
+                re_try_data['PMID'] = \
+                re.findall(re.compile('<input.*?name=\"PMID\".*?value=\"(.*?)\"', re.S), question_html)[
+                    0]
+                question_html = self.getHtmlSource(
+                    'http://learning.cmr.com.cn/student/acourse/HomeworkCenter/PracDeal.asp', re_try_data)
             question_regex = u'【([^】]*)】'
             regex_content = re.compile(
                 question_regex.encode('gbk'),
                 re.S)
             question_num_items = re.findall(regex_content, question_html)
-            answer = {}
+            answer = ''
             # print chardet.detect(answer_data)
             # 多线程匹配问题答案
             for question_num_item in question_num_items:
-                for key, value in self.find_answer(question_num_item, answer_data).items():
-                    answer.setdefault(key, value)
+                answer += self.find_answer(question_num_item, answer_data)
             # 获取提交答案路径
             regex_content = re.compile(
                 '<form.*?id="form1".*?name="form1".*?action="(.*?)"',
@@ -492,26 +508,34 @@ class Task:
                 print u'该作业无法完成'
                 self.log_insert(u'该作业无法完成')
                 continue
-            post_question_url = task_url + post_question_url_items[0]
+            if re_try != None:
+                post_question_url = 'http://learning.cmr.com.cn/student/acourse/HomeworkCenter/SavePracDeal.asp'
+            else:
+                post_question_url = task_url + post_question_url_items[0]
             # 创建post体
             data = answer
-            data['CourseID'] = \
-                re.findall(re.compile('<input.*?name=\"CourseID\".*?value=\"(.*?)\"', re.S), question_html)[0]
-            data['PMID'] = re.findall(re.compile('<input.*?name=\"PMID\".*?value=\"(.*?)\"', re.S), question_html)[0]
-            data['tmpSID'] = re.findall(re.compile('<input.*?name=\'tmpSID\'.*?value=\'(.*?)\'', re.S), question_html)[
-                0]
-            data['strStandardScore'] = \
-                re.findall(re.compile('<input.*?name=\'strStandardScore\'.*?value=\'(.*?)\'', re.S), question_html)[0]
+            data += 'CourseID=' + \
+                    re.findall(re.compile('<input.*?name=\"CourseID\".*?value=\"(.*?)\"', re.S), question_html)[0] + '&'
+            data += 'PMID=' + re.findall(re.compile('<input.*?name=\"PMID\".*?value=\"(.*?)\"', re.S), question_html)[
+                0] + '&'
+            data += 'tmpSID=' + \
+                    re.findall(re.compile('<input.*?name=\'tmpSID\'.*?value=\'(.*?)\'', re.S), question_html)[
+                        0] + '&'
+            data += 'strStandardScore=' + \
+                    re.findall(re.compile('<input.*?name=\'strStandardScore\'.*?value=\'(.*?)\'', re.S), question_html)[
+                        0]
             # post提交答案
             # test_url = 'http://192.168.92.129/Welcome/test11'
             print u'延迟10秒提交答案...'
             self.log_insert(u'延迟10秒提交答案...')
             time.sleep(10)
-            result = self.getHtmlSource(post_question_url)
+            result = self.getHtmlSource(post_question_url, data, True)
             print data
             self.log_insert(data)
-            print self.getScore(result)
-            self.log_insert(self.getScore(result))
+            score = self.getScore(result)
+            if score:
+                print score
+                self.log_insert(score.decode("GB2312"))
 
         print u'该科目作业已全部完成！！'
         self.log_insert(u'该科目作业已全部完成！！')
@@ -521,41 +545,40 @@ class Task:
     '''
 
     def find_answer(self, question_num_item, answer_data):
-        answer = {}
+        answer = ''
         # 匹配问题答案
         answer_regex = u'案】'
+        # 多项选择题
+        question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + '([A-Z],[^\n\r]+)'
 
-        question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + '([A-Z])'
         regex_content = re.compile(
             question_regex,
             re.S)
-        # 单项选择题
-        radio_items = re.findall(regex_content, answer_data)
-        if radio_items:
-            answer[question_num_item] = radio_items[0]
+        checkbox_items = re.findall(regex_content, answer_data)
+        if checkbox_items:
+            for item in checkbox_items[0].split(','):
+                answer += question_num_item + '=' + item + '&'
         else:
-            # 判断题
-            question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + u'(正确|错误)'
+            question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + '([A-Z])'
             regex_content = re.compile(
                 question_regex,
                 re.S)
-            judge_items = re.findall(regex_content, answer_data)
-            if judge_items:
-                if judge_items[0] == u'正确':
-                    answer[question_num_item] = 1
-                else:
-                    answer[question_num_item] = 0
+            # 单项选择题
+            radio_items = re.findall(regex_content, answer_data)
+            if radio_items:
+                answer += question_num_item + '=' + radio_items[0] + '&'
             else:
-                # 多项选择题
-                question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + '([A-Z],[^\n]+)'
+                # 判断题
+                question_regex = question_num_item + '[^' + u'案' + ']*' + answer_regex + u'(正确|错误)'
                 regex_content = re.compile(
                     question_regex,
                     re.S)
-                checkbox_items = re.findall(regex_content, answer_data)
-                if checkbox_items:
-                    answer[question_num_item] = checkbox_items[0].split(',')
-                else:
-                    answer[question_num_item] = ''
+                judge_items = re.findall(regex_content, answer_data)
+                if judge_items:
+                    if judge_items[0] == u'正确':
+                        answer += question_num_item + '=' + 1 + '&'
+                    else:
+                        answer += question_num_item + '=' + 0 + '&'
         return answer
 
     '''
